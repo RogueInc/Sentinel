@@ -1,0 +1,11 @@
+route:
+  receiver: sentinel
+receivers:
+  - name: sentinel
+    webhook_configs:
+      # host.docker.internal is Docker Desktop's special DNS name for
+      # reaching the host machine from inside a container -- correct
+      # here because sentinel's API runs directly on the host (uvicorn),
+      # not as a container named "api" on this network.
+      - url: http://host.docker.internal:8080/v1/alerts
+        send_resolved: true

@@ -1,0 +1,8 @@
+langgraph>=0.2
+langchain-core
+langgraph-checkpoint-postgres
+asyncpg
+httpx
+sentence-transformers
+pydantic
+pydantic-settings

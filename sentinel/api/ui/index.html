@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sentinel</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; margin: 0; }
+  .layout { display: flex; height: 100vh; }
+  .list { width: 320px; border-right: 1px solid #30363d; overflow-y: auto; }
+  .item { padding: 12px; border-bottom: 1px solid #21262d; cursor: pointer; }
+  .item:hover { background: #161b22; }
+  .item.selected { background: #1f2937; }
+  .badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-right: 6px; }
+  .critical { background: #f85149; color: #fff; }
+  .warning { background: #d29922; color: #000; }
+  .detail { flex: 1; padding: 20px; overflow-y: auto; }
+  .event { padding: 8px; border-left: 2px solid #30363d; margin-bottom: 6px; padding-left: 12px; font-size: 13px; }
+  .approval-card { background: #161b22; border: 1px solid #f85149; border-radius: 8px; padding: 16px; margin-top: 16px; }
+  button { background: #238636; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+  button.reject { background: #f85149; }
+  button.modify { background: #6e7681; }
+  pre { background: #010409; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="list" id="list"></div>
+  <div class="detail" id="detail">Select an incident</div>
+</div>
+<script>
+let selected = null;
+let es = null;
+
+async function loadList() {
+  const res = await fetch('/v1/incidents');
+  const incidents = await res.json();
+  const list = document.getElementById('list');
+  list.innerHTML = incidents.map(i => `
+    <div class="item ${i.id === selected ? 'selected' : ''}" onclick="select('${i.id}')">
+      <span class="badge ${i.severity}">${i.severity}</span>
+      <strong>${i.service}</strong>
+      <div style="font-size:12px;color:#8b949e">${i.status} — ${i.title}</div>
+    </div>
+  `).join('');
+}
+
+function select(id) {
+  selected = id;
+  loadList();
+  if (es) es.close();
+  document.getElementById('detail').innerHTML = '<div id="events"></div><div id="approval"></div>';
+  es = new EventSource(`/v1/incidents/${id}/stream`);
+  es.addEventListener('node_update', (e) => appendEvent(JSON.parse(e.data)));
+  es.addEventListener('paused', (e) => renderApproval(id));
+  es.addEventListener('completed', (e) => {
+      appendEvent({kind: 'completed', data: {}});
+      document.getElementById('approval').innerHTML = '';
+      es.close();
+  });
+  es.addEventListener('node_error', (e) => appendEvent({kind: 'error', data: JSON.parse(e.data || '{}')}));
+  // Native EventSource 'error' fires on real connection problems AND
+  // on the normal reconnect attempt after the server closes the
+  // stream. We already close() on 'completed' above, so any 'error'
+  // firing after that point is just the browser's own retry noise —
+  // ignore it instead of appending a bogus event block.
+  es.onerror = () => {};
+}
+
+function appendEvent(payload) {
+  const el = document.getElementById('events');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'event';
+  div.innerHTML = `<strong>${payload.kind || payload.data?.node || ''}</strong><pre>${JSON.stringify(payload.data, null, 2)}</pre>`;
+  el.appendChild(div);
+}
+
+async function renderApproval(incidentId) {
+  const res = await fetch(`/v1/incidents/${incidentId}`);
+  const incident = await res.json();
+  document.getElementById('approval').innerHTML = `
+    <div class="approval-card">
+      <strong>Awaiting approval</strong>
+      <div style="margin-top:8px">
+        <button onclick="decide('${incidentId}', 'approve')">Approve</button>
+        <button class="reject" onclick="decide('${incidentId}', 'reject')">Reject</button>
+      </div>
+    </div>
+  `;
+}
+
+async function decide(incidentId, decision) {
+  await fetch(`/v1/incidents/${incidentId}/approve`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({decision, by: 'on-call'}),
+  });
+  document.getElementById('approval').innerHTML = '<em>Decision sent.</em>';
+}
+
+loadList();
+setInterval(loadList, 5000);
+</script>
+</body>
+</html>

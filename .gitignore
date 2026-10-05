@@ -1,0 +1,56 @@
+# Environment / secrets — never commit real API keys
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.Python
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter (if you ever use notebooks to explore data)
+.ipynb_checkpoints/
+
+# Model caches (sentence-transformers downloads to the user's home dir by
+# default, not the repo, but ignore defensively in case that ever changes)
+.cache/
+*.safetensors
+
+# Docker
+docker-compose.override.yml
+
+# Postgres / Redis data if you ever bind-mount volumes locally
+pgdata/
+redisdata/
+
+# Logs
+*.log
+logs/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Node (only relevant if you add any frontend tooling later)
+node_modules/
